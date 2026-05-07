@@ -4,6 +4,8 @@ COVID-19 vs Normal vs Viral Pneumonia — inference UI for the model exported fr
 
 **Repo folder:** `projects/08-cnn/med-pred-web`
 
+**Streamlit Cloud:** If deploy logs show **`Python 3.14.x`**, TensorFlow will **not** install. **Delete** the Cloud app and redeploy with **Advanced settings → Python 3.12** (or 3.11). See **[DEPLOY.md](DEPLOY.md)**.
+
 ## Run locally
 
 ```bash

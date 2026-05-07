@@ -34,26 +34,25 @@ Create an **empty** GitHub repo first (no README) if this is the first push.
 
 ## 3. Streamlit Community Cloud
 
+**Critical:** Your **build logs must show** something like `Python 3.12.x` (or `3.11.x`). If they show **`Python 3.14.x`**, TensorFlow **will not install** on Linux (no wheels yet). That failure is **not** fixed by editing `requirements.txt` alone.
+
 1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub.
-2. **New app** → select repo + branch **`main`**.
-3. **Main file path:** `app.py`
-4. **Before you deploy:** open **Advanced settings** and set **Python version** to **3.12** (or **3.11**).  
-   **Do not use Python 3.14** for this app: TensorFlow has **no matching wheels** for 3.14 on Linux, so you will see errors like *“no wheels with a matching Python ABI tag”* or *“No matching distribution found for tensorflow”*.
-5. Click **Deploy**.
+2. Click **Create app** (or equivalent).
+3. Select repo + branch **`main`**, **Main file path:** `app.py` (or the path to your entrypoint in that repo).
+4. **Before you click Deploy:** open **Advanced settings** (sometimes labeled **▼** or **Optional configuration**).
+5. In **Python version**, pick **3.12.x** (or **3.11.x**). **Do not** leave **3.14** selected.
+6. Click **Save** on the Advanced modal if present, then **Deploy**.
 
 Cloud installs from **`requirements.txt`** and runs **`streamlit run app.py`**.
 
-### If the app was already created on Python 3.14
+### If logs still show Python 3.14 after you “fixed” settings
 
-The UI may default to a new Python; fix it without guessing:
+On Community Cloud, **Python is chosen when the app is created** (see [Deploy your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy): **Advanced settings** → **Python version**). The [App settings](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/app-settings) page documents URL, sharing, and secrets — **not** changing the interpreter. So if your deployment is stuck on **3.14**:
 
-1. Open your app on Community Cloud → **Manage app** (⋮) → **Settings**.
-2. Under **Python version**, choose **3.12.10** (or any **3.12.x** / **3.11.x** offered).
-3. **Save** and let the app **rebuild**, or use **Reboot** after saving.
-
-If you **cannot** change Python on the existing deployment, **delete** the app and **deploy again**, making sure **Advanced settings → Python 3.12** is set **before** the first build.
-
-Official reference: [Upgrade your app’s Python version](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python-version).
+1. **[Delete your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/delete-your-app)** from the workspace (⋮ → delete, or the dashboard delete flow).
+2. **Create app** again from the same GitHub repo.
+3. On the **first** deploy dialog, open **Advanced settings** and select **Python 3.12** (or **3.11**) **before** the first build completes.
+4. Confirm in logs: `Using Python 3.12` / `3.11` — **not** `3.14`.
 
 ## 4. After model updates
 
@@ -62,7 +61,7 @@ Re-export from the notebook (Task 9), replace files under **`artifacts/`**, comm
 ## Troubleshooting
 
 - **Python 3.14 + `tensorflow` / “unsatisfiable” / “no matching distribution”**  
-  TensorFlow does not support Python **3.14** on Streamlit’s Linux build image yet. **Set Python to 3.12** in app settings (see section 3) and redeploy. This is the most common cause of a failed **uv** / **pip** install for this repo.
+  TensorFlow has **no wheels for Python 3.14** on Streamlit’s Linux image. You cannot fix this from `requirements.txt` alone. **Delete the app** on Community Cloud and **create it again**; in **Advanced settings** pick **Python 3.12** or **3.11** before the first deploy (see section 3). Confirm logs show `Python 3.12` / `3.11`, not `3.14`.
 
 - **`Missing covid_xray_best_model.keras`:** Ensure the `.keras` file is committed (or on LFS) and path is **`artifacts/covid_xray_best_model.keras`** (case-sensitive on Linux).
 

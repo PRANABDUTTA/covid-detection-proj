@@ -11,11 +11,16 @@ From **`Covid19_Chest_Xrays_CNN.ipynb`**, run **Task 9** after training. That sa
 
 Copy both into **`med-pred-web/artifacts/`** (same names).
 
-**Large models:** GitHub blocks files **> 100 MB**. Options:
+**Large models / Cloud without committing the file:** GitHub blocks files **> 100 MB**. Use one of:
 
-- **[Git LFS](https://git-lfs.com)** to track `artifacts/*.keras`, or  
-- Remove `artifacts/*.keras` from `.gitignore` only after switching to LFS, or  
-- Store the file externally and download at startup (not implemented in the default app).
+- **[Git LFS](https://git-lfs.com)** to track `artifacts/*.keras` (remove the `artifacts/*.keras` line from `.gitignore` only after LFS is set up), or  
+- **Direct URL (no large file in GitHub):** upload the `.keras` file to a host that offers a **direct HTTPS download** (e.g. a **GitHub Release** asset, cloud blob with a signed/static URL). In Streamlit Community Cloud: **App settings → Secrets** add:
+
+  ```toml
+  MODEL_URL = "https://example.com/path/covid_xray_best_model.keras"
+  ```
+
+  On first run the app downloads the file to the container cache and loads it (see `app.py`).
 
 ## 2. Initialize Git and push (if not already)
 

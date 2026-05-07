@@ -8,6 +8,10 @@ Place exported files under ./artifacts/ (see README.md).
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
+import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +30,53 @@ IMG_SIZE = (224, 224)
 MODEL_FILE = "covid_xray_best_model.keras"
 META_FILE = "covid_xray_best_model_metadata.json"
 
+# Streamlit Cloud: repo is often deployed without the .keras file (gitignored).
+# Set MODEL_URL in App settings → Secrets (or env) to a direct HTTPS URL to the file.
+_CACHE_DIR = Path(tempfile.gettempdir()) / "covid_xray_streamlit_cache"
+
+
+def _model_url() -> str | None:
+    u = os.environ.get("MODEL_URL", "").strip()
+    if u:
+        return u
+    try:
+        if "MODEL_URL" in st.secrets:
+            return str(st.secrets["MODEL_URL"]).strip()
+    except (FileNotFoundError, KeyError, RuntimeError):
+        pass
+    return None
+
+
+def _download_file(url: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "covid-xray-streamlit/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=600) as resp:
+        with open(dest, "wb") as out:
+            shutil.copyfileobj(resp, out)
+
+
+def get_model_path() -> tuple[Path | None, str | None]:
+    """Return path to .keras file, or (None, error message)."""
+    local = ART / MODEL_FILE
+    if local.exists():
+        return local, None
+
+    url = _model_url()
+    if not url:
+        return None, None
+
+    cached = _CACHE_DIR / MODEL_FILE
+    try:
+        if not cached.exists():
+            _download_file(url, cached)
+    except Exception as e:
+        return None, f"Could not download model from MODEL_URL: {e}"
+
+    return cached, None
+
 
 def load_metadata() -> dict:
     p = ART / META_FILE
@@ -35,11 +86,8 @@ def load_metadata() -> dict:
 
 
 @st.cache_resource
-def load_model():
-    path = ART / MODEL_FILE
-    if not path.exists():
-        return None
-    return tf.keras.models.load_model(path)
+def load_model(path_str: str):
+    return tf.keras.models.load_model(Path(path_str))
 
 
 def preprocess_rgb(pil_img: Image.Image) -> np.ndarray:
@@ -58,13 +106,21 @@ def main():
         "Model exported from `Covid19_Chest_Xrays_CNN.ipynb` (Task 9)."
     )
 
-    model = load_model()
-    if model is None:
+    path, dl_err = get_model_path()
+    if dl_err:
+        st.error(dl_err)
+        st.stop()
+
+    if path is None:
         st.error(
-            f"Missing `{ART / MODEL_FILE}`. Export in Task 9, then copy `.keras` "
-            f"(and optional `{META_FILE}`) into `artifacts/` next to this repo layout."
+            f"Missing `{ART / MODEL_FILE}` in the deployed repo. "
+            "Export in Task 9, then either:\n\n"
+            "**A)** Commit the file under `artifacts/` (use **Git LFS** if >100 MB), **or**\n\n"
+            "**B)** Host the `.keras` file at a **direct download HTTPS URL** and add to "
+            "**App settings → Secrets**:\n\n"
+            "`MODEL_URL = \"https://.../covid_xray_best_model.keras\"`"
         )
-        with st.expander("Expected layout"):
+        with st.expander("Expected layout (option A)"):
             st.code(
                 "med-pred-web/\n"
                 "  app.py\n"
@@ -74,6 +130,8 @@ def main():
                 language="text",
             )
         st.stop()
+
+    model = load_model(str(path))
 
     if meta:
         st.info(

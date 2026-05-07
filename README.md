@@ -27,7 +27,7 @@ streamlit run app.py
 
 ## Deploy (GitHub + Streamlit Community Cloud)
 
-See **[DEPLOY.md](DEPLOY.md)**. On Streamlit Cloud, set **Python 3.12** (or 3.11) in **Advanced settings** — **not 3.14**, or **TensorFlow will not install** (no wheels for 3.14 yet).
+See **[DEPLOY.md](DEPLOY.md)**. Use **Python 3.12** (or 3.11) in **Advanced settings**, not 3.14. If the `.keras` file is not in Git (see `.gitignore`), set **`MODEL_URL`** in Streamlit **Secrets** to a direct HTTPS link to the file.
 
 ## Artifacts
 

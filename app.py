@@ -7,6 +7,7 @@ Place exported files under ./artifacts/ (see README.md).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -34,6 +35,27 @@ META_FILE = "covid_xray_best_model_metadata.json"
 # Set MODEL_URL in App settings → Secrets (or env) to a direct HTTPS URL to the file.
 _CACHE_DIR = Path(tempfile.gettempdir()) / "covid_xray_streamlit_cache"
 
+# .keras is a ZIP archive; HTML error pages often start with "<".
+_KERAS_MAGIC = b"PK\x03\x04"
+
+
+def _looks_like_keras_file(path: Path) -> bool:
+    try:
+        if path.stat().st_size < 4096:
+            return False
+        with open(path, "rb") as f:
+            head = f.read(512)
+    except OSError:
+        return False
+    if head.lstrip().startswith(b"<") or head.lstrip().startswith(b"<!"):
+        return False
+    return head.startswith(_KERAS_MAGIC)
+
+
+def _cached_model_path_for_url(url: str) -> Path:
+    h = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
+    return _CACHE_DIR / f"{h}_{MODEL_FILE}"
+
 
 def _model_url() -> str | None:
     u = os.environ.get("MODEL_URL", "").strip()
@@ -49,13 +71,22 @@ def _model_url() -> str | None:
 
 def _download_file(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".part")
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "covid-xray-streamlit/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
-        with open(dest, "wb") as out:
-            shutil.copyfileobj(resp, out)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            status = getattr(resp, "status", None) or resp.getcode()
+            if status and int(status) >= 400:
+                raise OSError(f"HTTP {status} from URL (check link / permissions).")
+            with open(tmp, "wb") as out:
+                shutil.copyfileobj(resp, out)
+        tmp.replace(dest)
+    finally:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
 
 
 def get_model_path() -> tuple[Path | None, str | None]:
@@ -68,11 +99,24 @@ def get_model_path() -> tuple[Path | None, str | None]:
     if not url:
         return None, None
 
-    cached = _CACHE_DIR / MODEL_FILE
+    cached = _cached_model_path_for_url(url)
     try:
-        if not cached.exists():
-            _download_file(url, cached)
+        if cached.exists() and _looks_like_keras_file(cached):
+            return cached, None
+        if cached.exists():
+            cached.unlink()
+
+        _download_file(url, cached)
+        if not _looks_like_keras_file(cached):
+            cached.unlink(missing_ok=True)
+            return (
+                None,
+                "MODEL_URL downloaded something that is not a valid `.keras` ZIP "
+                "(often an HTML login or error page). Use a **direct file** URL — e.g. "
+                "GitHub **Release asset** link, not the repo file viewer page.",
+            )
     except Exception as e:
+        cached.unlink(missing_ok=True)
         return None, f"Could not download model from MODEL_URL: {e}"
 
     return cached, None
@@ -87,7 +131,8 @@ def load_metadata() -> dict:
 
 @st.cache_resource
 def load_model(path_str: str):
-    return tf.keras.models.load_model(Path(path_str))
+    # compile=False avoids optimizer edge cases and matches inference-only use.
+    return tf.keras.models.load_model(Path(path_str), compile=False)
 
 
 def preprocess_rgb(pil_img: Image.Image) -> np.ndarray:
@@ -131,7 +176,17 @@ def main():
             )
         st.stop()
 
-    model = load_model(str(path))
+    try:
+        model = load_model(str(path))
+    except Exception as e:
+        st.error(
+            "TensorFlow could not load the model file. Common causes: corrupt download, "
+            "wrong file URL, or train/save TF version very different from Cloud. "
+            "Try re-export in Task 9 or fix MODEL_URL."
+        )
+        with st.expander("Technical details"):
+            st.exception(e)
+        st.stop()
 
     if meta:
         st.info(

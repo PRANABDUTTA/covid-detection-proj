@@ -61,6 +61,9 @@ def _model_url() -> str | None:
     u = os.environ.get("MODEL_URL", "").strip()
     if u:
         return u
+    for key, val in os.environ.items():
+        if key.upper() == "MODEL_URL" and val.strip():
+            return val.strip()
     try:
         if "MODEL_URL" in st.secrets:
             return str(st.secrets["MODEL_URL"]).strip()
@@ -157,22 +160,43 @@ def main():
         st.stop()
 
     if path is None:
+        expected = ART / MODEL_FILE
         st.error(
-            f"Missing `{ART / MODEL_FILE}` in the deployed repo. "
-            "Export in Task 9, then either:\n\n"
-            "**A)** Commit the file under `artifacts/` (use **Git LFS** if >100 MB), **or**\n\n"
-            "**B)** Host the `.keras` file at a **direct download HTTPS URL** and add to "
-            "**App settings → Secrets**:\n\n"
-            "`MODEL_URL = \"https://.../covid_xray_best_model.keras\"`"
+            "**No model available.** The app checks two things in order:\n\n"
+            "1. **File in Git next to `app.py`:**\n"
+            f"   `{expected}`\n\n"
+            "2. **`MODEL_URL`** in Streamlit **App settings → Secrets** (direct HTTPS link to the `.keras` file).\n\n"
+            "**Right now:** that path is missing from the deployed repo **and** **`MODEL_URL` is not set** "
+            "(or the app was not rebooted after saving Secrets)."
         )
-        with st.expander("Expected layout (option A)"):
+        with st.expander("Option A — commit `artifacts/` into this repo (same folder as your Streamlit main file)"):
+            rel_root = ROOT.name or "."
+            st.markdown(
+                "Your Cloud **Main file path** decides where `artifacts/` must live. "
+                "`artifacts/` is always **next to `app.py`**.\n\n"
+                f"- If Main file is **`app.py`** (repo root), commit: **`artifacts/{MODEL_FILE}`**\n"
+                f"- If Main file is **`med-pred-web/app.py`**, commit: **`med-pred-web/artifacts/{MODEL_FILE}`**\n\n"
+                "Putting the model only under `med-pred-web/artifacts/` **does not work** if Streamlit runs **`app.py`** from the **repo root**."
+            )
             st.code(
-                "med-pred-web/\n"
-                "  app.py\n"
+                f"{rel_root}/\n"
+                "  app.py          # your Streamlit entrypoint\n"
                 "  artifacts/\n"
                 f"    {MODEL_FILE}\n"
                 f"    {META_FILE}   # optional\n",
                 language="text",
+            )
+        with st.expander("Option B — `MODEL_URL` in Streamlit Cloud"):
+            st.markdown(
+                "1. Open [share.streamlit.io](https://share.streamlit.io) → your workspace.\n"
+                "2. Find this app → **⋮** → **Settings**.\n"
+                "3. Open the **Secrets** tab.\n"
+                "4. Paste (replace with your real URL):\n\n"
+                "```toml\n"
+                'MODEL_URL = "https://github.com/<you>/<repo>/releases/download/<tag>/covid_xray_best_model.keras"\n'
+                "```\n\n"
+                "5. **Save**, then **Manage app → Reboot** (secrets are not always picked up until reboot).\n\n"
+                "Use a **Release asset** or other **direct download** link—not the GitHub HTML page for the file."
             )
         st.stop()
 

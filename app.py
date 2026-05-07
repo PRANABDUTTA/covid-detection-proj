@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 import tensorflow as tf
 
 st.set_page_config(page_title="Chest X-ray classifier", layout="centered")
@@ -139,9 +139,27 @@ def load_model(path_str: str):
 
 
 def preprocess_rgb(pil_img: Image.Image) -> np.ndarray:
-    img = pil_img.convert("RGB").resize(IMG_SIZE, Image.Resampling.LANCZOS)
-    x = np.asarray(img, dtype=np.float32) / 255.0
+    """Match notebook `load_image` + `paths_to_tensors`: RGB, area resize (cv2.INTER_AREA), [0, 1]."""
+    img = ImageOps.exif_transpose(pil_img)
+    rgb = np.asarray(img.convert("RGB"), dtype=np.float32)
+    t = tf.convert_to_tensor(rgb)
+    t = tf.image.resize(t, IMG_SIZE, method="area")
+    x = (t.numpy().astype(np.float32)) / 255.0
     return np.expand_dims(x, axis=0)
+
+
+def _uncertainty_hint(probs: np.ndarray) -> str | None:
+    """Surface uncertain predictions common on out-of-distribution (random web) images."""
+    p = np.clip(probs.astype(np.float64), 1e-12, 1.0)
+    ent = float(-np.sum(p * np.log(p)))
+    max_p = float(np.max(p))
+    if max_p < 0.45 or ent > 0.95:
+        return (
+            "Prediction confidence is **low** (probabilities spread across classes). "
+            "Images from the web often differ from the **Covid19-dataset** used for training "
+            "(equipment, contrast, crop, view), so accuracy outside that distribution is not guaranteed."
+        )
+    return None
 
 
 def main():
@@ -151,7 +169,9 @@ def main():
     st.title("COVID-19 chest X-ray — CNN classifier")
     st.caption(
         "Educational demo only — not for clinical use. "
-        "Model exported from `Covid19_Chest_Xrays_CNN.ipynb` (Task 9)."
+        "Model exported from `Covid19_Chest_Xrays_CNN.ipynb` (Task 9). "
+        "Best results on images **similar to the training dataset** (PA/view chest X-rays); "
+        "random internet photos often fail or look uncertain."
     )
 
     path, dl_err = get_model_path()
@@ -228,6 +248,10 @@ def main():
     x = preprocess_rgb(img)
     probs = model.predict(x, verbose=0)[0]
     pred_idx = int(np.argmax(probs))
+
+    hint = _uncertainty_hint(probs)
+    if hint:
+        st.warning(hint)
 
     st.subheader("Prediction")
     st.metric("Predicted class", classes[pred_idx])

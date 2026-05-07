@@ -1,4 +1,7 @@
-# TensorFlow: pin a range with stable wheels on Linux (Streamlit Cloud) and Windows.
+# TensorFlow wheels do NOT support Python 3.14+ on Linux yet. On Streamlit Community Cloud you
+# MUST set Python to 3.12 (or 3.11) in the app settings — see DEPLOY.md — or pip will fail.
+#
+# TensorFlow: version range with manylinux wheels on Python 3.11 / 3.12.
 streamlit>=1.28.0
 tensorflow>=2.14.0,<2.18.0
 numpy>=1.24.0

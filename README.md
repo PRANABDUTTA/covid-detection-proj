@@ -25,7 +25,7 @@ streamlit run app.py
 
 ## Deploy (GitHub + Streamlit Community Cloud)
 
-See **[DEPLOY.md](DEPLOY.md)** — same workflow as `telco-churn-streamlit`: push this repo, deploy with **Main file:** `app.py`, Python **3.11** or **3.12**.
+See **[DEPLOY.md](DEPLOY.md)**. On Streamlit Cloud, set **Python 3.12** (or 3.11) in **Advanced settings** — **not 3.14**, or **TensorFlow will not install** (no wheels for 3.14 yet).
 
 ## Artifacts
 

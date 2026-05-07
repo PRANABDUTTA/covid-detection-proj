@@ -1,0 +1,10 @@
+{
+  "classes": [
+    "Covid",
+    "Normal",
+    "Viral Pneumonia"
+  ],
+  "img_size": 224,
+  "best_model_name": "ResNet50",
+  "test_acc": 0.9242424242424242
+}

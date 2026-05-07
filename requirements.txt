@@ -1,0 +1,6 @@
+# TensorFlow: pin a range with stable wheels on Linux (Streamlit Cloud) and Windows.
+streamlit>=1.28.0
+tensorflow>=2.14.0,<2.18.0
+numpy>=1.24.0
+pandas>=2.0.0
+Pillow>=10.0.0
